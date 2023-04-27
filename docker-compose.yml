@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+  db:
+    image: "postgres:13"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123qwerty
+      POSTGRES_DB: data-english
+    volumes:
+      - "db_data:/var/lib/postgresql/data"
+
+volumes:
+  db_data:
