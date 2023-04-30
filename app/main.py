@@ -1,5 +1,11 @@
-import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import os
+from fastapi import FastAPI, HTTPException, File, UploadFile
+
+import datetime
 import uuid
 from typing import Dict
 import aiohttp
@@ -7,27 +13,30 @@ import httpx
 import openai
 import speech_recognition as sr
 from pydub import AudioSegment
-from fastapi import FastAPI, HTTPException, File, UploadFile
 from databases import Database
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from app.auth import AuthRequest, signin, signup
+
+
 from .schema import Base, Transcription
 
+from supabase import create_client, Client
 
-DEEPGRAM_API_KEY = "a720953fb3ec15bfd9f24b9d6060b970defded56"
+
+url = os.environ.get("SUPABASE_URL")
+key = os.environ.get("SUPABASE_KEY")
+supabase: Client = create_client(url, key)
+
+data = supabase.table("transcriptions").select("*").execute()
+dataid_name = supabase.table("users").select("id,sex,phone_number").execute()
+
+DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY")
 openai.api_key = "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"
-DATABASE_URL = "postgresql://postgres:123qwerty@db:5432/data-english"
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 app = FastAPI()
 
 uploaded_files: Dict[str, str] = {}
 
-# Configure the database connection
-
-engine = create_engine(DATABASE_URL)
-Base.metadata.create_all(engine)
-
-Session = sessionmaker(bind=engine)
 
 database = Database(DATABASE_URL)
 
@@ -84,6 +93,18 @@ async def root():
     return {"message": "Welcome to the transcription API"}
 
 
+@app.post("/signup")
+async def register_user(auth_request: AuthRequest):
+    response = await signup(auth_request)
+    return response
+
+
+@app.post("/signin")
+async def login_user(auth_request: AuthRequest):
+    response = await signin(auth_request)
+    return response
+
+
 @app.post("/upload_audio/")
 async def upload_audio(audio: UploadFile = File(...)):
     file_id = str(uuid.uuid4())
@@ -118,7 +139,7 @@ async def upload_audio(audio: UploadFile = File(...)):
     query = Transcription.__table__.insert().values(
         file_id=file_id, transcription=transcription
     )
-    await database.execute(query)
+    # await database.execute(query)
 
     return {"file_id": file_id, "transcription": transcription}
 
@@ -142,6 +163,10 @@ async def test_upload(audio: UploadFile = File(...)):
     ai_response = response["choices"][0]["message"]["content"]
     ai_response = ai_response.replace("\n", "")
 
+    supabase.table("transcriptions").insert(
+        {"user_transcription": transcription, "ai_response": ai_response}
+    ).execute()
+
     # Store the transcription and the file_id in the database
     query = Transcription.__table__.insert().values(
         user_id=None,
@@ -150,7 +175,7 @@ async def test_upload(audio: UploadFile = File(...)):
         timestamp=datetime.datetime.utcnow(),
     )
 
-    await database.execute(query)
+    # await database.execute(query)
 
     return {
         "file_id": file_id,
@@ -179,7 +204,7 @@ async def transcribe(file_id: str):
         ai_response=None,
         timestamp=datetime.datetime.utcnow(),
     )
-    await database.execute(query)
+    # await database.execute(query)
 
     return {"file_id": file_id, "transcription": transcription}
 

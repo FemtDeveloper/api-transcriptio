@@ -9,6 +9,7 @@ RUN apt-get update && \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY .env ./
 COPY . .
 
-CMD ["sh", "-c", "python clean_audio_files.py & uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "python -m dotenv run -- clean_audio_files.py & uvicorn app.main:app --host 0.0.0.0 --port 8000"]
