@@ -16,13 +16,13 @@ from .schema import Base, Transcription
 
 DEEPGRAM_API_KEY = "a720953fb3ec15bfd9f24b9d6060b970defded56"
 openai.api_key = "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"
+DATABASE_URL = "postgresql://postgres:123qwerty@db:5432/data-english"
 
 app = FastAPI()
 
 uploaded_files: Dict[str, str] = {}
 
 # Configure the database connection
-DATABASE_URL = "postgresql://postgres:123qwerty@db:5432/data-english"
 
 engine = create_engine(DATABASE_URL)
 Base.metadata.create_all(engine)

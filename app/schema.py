@@ -31,5 +31,6 @@ class Transcription(Base):
     user_transcription = Column(String)
     ai_response = Column(String)
     timestamp = Column(DateTime)
+    tokens_calculated = Column(Integer)
 
     user = relationship("User", back_populates="transcriptions")
