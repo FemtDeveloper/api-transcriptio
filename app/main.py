@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 
 import uuid
 from typing import Dict
@@ -164,3 +164,41 @@ async def get_all_transcriptions():
 async def get_all_users():
     users = supabase.table("users").select("*").execute()
     return users
+
+
+@app.get("/user/{user_id}")
+async def get_user_by_id(user_id: str):
+    user = supabase.table("users").select("*").eq("id", user_id).execute()
+    if user:
+        return user
+    else:
+        raise HTTPException(status_code=404, detail="User not found")
+
+
+@app.get("/transcription/{transcription_id}")
+async def get_transcription_by_id(transcription_id: str):
+    print(transcription_id)
+    transcription = (
+        supabase.table("transcriptions")
+        .select("*")
+        .eq("id", transcription_id)
+        .execute()
+    )
+
+    if transcription:
+        return transcription
+    else:
+        raise HTTPException(status_code=404, detail="Transcription not found")
+
+
+@app.get("/transcriptions/user/{user_id}")
+async def get_transcriptions_by_user_id(user_id: str):
+    transcriptions = (
+        supabase.table("transcriptions").select("*").eq("user_id", user_id).execute()
+    )
+    if transcriptions:
+        return transcriptions
+    else:
+        raise HTTPException(
+            status_code=404, detail="Transcriptions not found for the specified user"
+        )
