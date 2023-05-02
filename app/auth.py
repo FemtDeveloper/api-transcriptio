@@ -40,7 +40,7 @@ async def signup(auth_request: AuthRequest):
 
 async def signin(auth_request: AuthRequest):
     try:
-        user, error = await supabase.auth.sign_in_with_password(
+        user, error = supabase.auth.sign_in_with_password(
             {"email": auth_request.email, "password": auth_request.password}
         )
     except Exception as e:
