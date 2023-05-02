@@ -1,36 +1,48 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float, JSON
-from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declarative_base
-
-Base = declarative_base()
+from pydantic import BaseModel, UUID4, EmailStr
+from typing import List, Optional
+from datetime import datetime
 
 
-class User(Base):
-    __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True)
-    name = Column(String)
-    nationality = Column(String)
-    age = Column(Integer)
-    email = Column(String)
-    phone_number = Column(String)
-    time_spent_in_app = Column(Float)
-    interests = Column(JSON)
-    profile_creation_date = Column(DateTime)
-    credits = Column(Integer)
-    assistant_name = Column(String)
-
-    transcriptions = relationship("Transcription", back_populates="user")
+class UserBase(BaseModel):
+    name: Optional[str] = None
+    nationality: Optional[str] = None
+    age: Optional[int] = None
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
+    time_spent_in_app: Optional[float] = None
+    interests: Optional[List[str]] = None  # Change this line
+    profile_creation_date: Optional[datetime] = None
+    credits: Optional[int] = None
+    assistant_name: Optional[str] = None
 
 
-class Transcription(Base):
-    __tablename__ = "transcriptions"
+class UserCreate(UserBase):
+    email: EmailStr
+    password: str
+    username: str
 
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    user_transcription = Column(String)
-    ai_response = Column(String)
-    timestamp = Column(DateTime)
-    tokens_calculated = Column(Integer)
 
-    user = relationship("User", back_populates="transcriptions")
+class User(UserBase):
+    id: UUID4
+
+    class Config:
+        orm_mode = True
+
+
+class TranscriptionBase(BaseModel):
+    user_id: Optional[UUID4] = None
+    user_transcription: Optional[str] = None
+    ai_response: Optional[str] = None
+    created_at: Optional[datetime] = None
+    tokens_calculated: Optional[int] = None
+
+
+class TranscriptionCreate(TranscriptionBase):
+    pass
+
+
+class Transcription(TranscriptionBase):
+    id: int
+
+    class Config:
+        orm_mode = True

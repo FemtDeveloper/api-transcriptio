@@ -3,9 +3,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
-from fastapi import FastAPI, HTTPException, File, UploadFile
+from fastapi import FastAPI, File, UploadFile
 
-import datetime
 import uuid
 from typing import Dict
 import aiohttp
@@ -13,11 +12,13 @@ import httpx
 import openai
 import speech_recognition as sr
 from pydub import AudioSegment
-from databases import Database
 from app.auth import AuthRequest, signin, signup
-
-
-from .schema import Base, Transcription
+from app.schema import (
+    User,
+    UserCreate,
+    TranscriptionCreate,
+    Transcription,
+)  # Importing the necessary modules
 
 from supabase import create_client, Client
 
@@ -26,31 +27,13 @@ url = os.environ.get("SUPABASE_URL")
 key = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(url, key)
 
-data = supabase.table("transcriptions").select("*").execute()
-dataid_name = supabase.table("users").select("id,sex,phone_number").execute()
 
 DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY")
-openai.api_key = "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"
-DATABASE_URL = os.environ.get("DATABASE_URL")
+openai.api_key = os.environ.get("OPEN_API_KEY")
 
 app = FastAPI()
 
 uploaded_files: Dict[str, str] = {}
-
-
-database = Database(DATABASE_URL)
-
-
-# Connect to the database
-@app.on_event("startup")
-async def startup():
-    await database.connect()
-
-
-# Disconnect from the database
-@app.on_event("shutdown")
-async def shutdown():
-    await database.disconnect()
 
 
 async def call_openai_chat_model(transcription: str):
@@ -94,8 +77,10 @@ async def root():
 
 
 @app.post("/signup")
-async def register_user(auth_request: AuthRequest):
-    response = await signup(auth_request)
+async def register_user(
+    user: UserCreate,
+):  # Update the endpoint to use the UserCreate Pydantic model
+    response = await signup(user)
     return response
 
 
@@ -105,7 +90,7 @@ async def login_user(auth_request: AuthRequest):
     return response
 
 
-@app.post("/upload_audio/")
+@app.post("/transcribe/")
 async def upload_audio(audio: UploadFile = File(...)):
     file_id = str(uuid.uuid4())
     file_location = f"audio_files/{file_id}.wav"
@@ -135,13 +120,10 @@ async def upload_audio(audio: UploadFile = File(...)):
         audio_data = recognizer.record(source)
         transcription = recognizer.recognize_google(audio_data)
 
-    # Store the transcription in the database
-    query = Transcription.__table__.insert().values(
-        file_id=file_id, transcription=transcription
-    )
-    # await database.execute(query)
-
-    return {"file_id": file_id, "transcription": transcription}
+    return {
+        "file_id": file_id,
+        "transcription": transcription,
+    }
 
 
 @app.post("/test_upload/")
@@ -157,8 +139,6 @@ async def test_upload(audio: UploadFile = File(...)):
     # Transcribe the audio file using Deepgram API
     transcription = await transcribe_audio_with_deepgram(file_location)
 
-    print(transcription)
-
     response = await call_openai_chat_model(transcription)
     ai_response = response["choices"][0]["message"]["content"]
     ai_response = ai_response.replace("\n", "")
@@ -167,16 +147,6 @@ async def test_upload(audio: UploadFile = File(...)):
         {"user_transcription": transcription, "ai_response": ai_response}
     ).execute()
 
-    # Store the transcription and the file_id in the database
-    query = Transcription.__table__.insert().values(
-        user_id=None,
-        user_transcription=transcription,
-        ai_response=ai_response,
-        timestamp=datetime.datetime.utcnow(),
-    )
-
-    # await database.execute(query)
-
     return {
         "file_id": file_id,
         "transcription": transcription,
@@ -184,48 +154,13 @@ async def test_upload(audio: UploadFile = File(...)):
     }
 
 
-@app.get("/transcribe/{file_id}")
-async def transcribe(file_id: str):
-    if file_id not in uploaded_files:
-        raise HTTPException(status_code=404, detail="File not found")
-
-    file_location = uploaded_files[file_id]
-
-    # Transcribe the audio file
-    recognizer = sr.Recognizer()
-    with sr.AudioFile(file_location) as source:
-        audio_data = recognizer.record(source)
-        transcription = recognizer.recognize_google(audio_data)
-
-    # Store the transcription in the database
-    query = Transcription.__table__.insert().values(
-        user_id=None,
-        user_transcription=transcription,
-        ai_response=None,
-        timestamp=datetime.datetime.utcnow(),
-    )
-    # await database.execute(query)
-
-    return {"file_id": file_id, "transcription": transcription}
-
-
-@app.get("/next_file/{file_id}")
-async def next_file(file_id: str):
-    file_ids = list(uploaded_files.keys())
-    try:
-        current_index = file_ids.index(file_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="File not found")
-
-    if current_index + 1 >= len(file_ids):
-        raise HTTPException(status_code=404, detail="No next file available")
-
-    next_file_id = file_ids[current_index + 1]
-    return {"file_id": next_file_id}
-
-
 @app.get("/transcriptions")
 async def get_all_transcriptions():
-    query = Transcription.__table__.select()
-    results = await database.fetch_all(query)
-    return results
+    transcriptions = supabase.table("transcriptions").select("*").execute()
+    return transcriptions
+
+
+@app.get("/users")
+async def get_all_users():
+    users = supabase.table("users").select("*").execute()
+    return users

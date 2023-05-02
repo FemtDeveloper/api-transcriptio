@@ -14,3 +14,5 @@ python-multipart
 databases
 supabase
 python-dotenv
+pydantic
+email-validator
