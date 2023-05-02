@@ -26,9 +26,9 @@ async def signup(auth_request: AuthRequest):
         user, error = supabase.auth.sign_up(
             {"email": auth_request.email, "password": auth_request.password}
         )
-    except error:
-        print(f"Error: {error}")
-        raise HTTPException(status_code=400, detail=str(error))
+    except Exception as e:
+        print(f"Error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     user_data = user[1]
     user_id = user_data.id
 
@@ -40,10 +40,10 @@ async def signup(auth_request: AuthRequest):
 
 async def signin(auth_request: AuthRequest):
     try:
-        user, error = supabase.auth.sign_in_with_password(
+        user, error = await supabase.auth.sign_in_with_password(
             {"email": auth_request.email, "password": auth_request.password}
         )
-    except error as e:
+    except Exception as e:
         print(f"Error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -53,7 +53,7 @@ async def signin(auth_request: AuthRequest):
 async def create_user_in_users_table(user_id, email, username):
     try:
         data, error = (
-            supabase.table("users")
+            await supabase.table("users")
             .insert(
                 {
                     "id": user_id,
@@ -64,7 +64,7 @@ async def create_user_in_users_table(user_id, email, username):
             .execute()
         )
 
-    except error:
-        print(f"Error inserting user into custom table: {error.message}")
+    except Exception as e:
+        print(f"Error inserting user into custom table: {e}")
     else:
         print(f"User inserted into custom table: {data}")
