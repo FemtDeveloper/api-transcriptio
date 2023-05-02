@@ -14,10 +14,7 @@ import speech_recognition as sr
 from pydub import AudioSegment
 from app.auth import AuthRequest, signin, signup
 from app.schema import (
-    User,
     UserCreate,
-    TranscriptionCreate,
-    Transcription,
 )  # Importing the necessary modules
 
 from supabase import create_client, Client

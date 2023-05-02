@@ -5,19 +5,14 @@ from fastapi import HTTPException
 import json
 import os
 from supabase import create_client, Client
+
+
 from pydantic import BaseModel
-from gotrue.errors import AuthApiError
 
 
 url = os.environ.get("SUPABASE_URL")
 key = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(url, key)
-# # Create a random user login email and password.
-remail = "3hf82fijf92@supamail.com"
-rpassword = "fqj13bnf2hiu23h"
-name = "sdjsnjjx"
-# user = supabase.auth.sign_up({"email": remail, "password": rpassword})
-# print(user)
 
 
 class AuthRequest(BaseModel):
@@ -31,9 +26,9 @@ async def signup(auth_request: AuthRequest):
         user, error = supabase.auth.sign_up(
             {"email": auth_request.email, "password": auth_request.password}
         )
-    except AuthApiError as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+    except error:
+        print(f"Error: {error}")
+        raise HTTPException(status_code=400, detail=str(error))
     user_data = user[1]
     user_id = user_data.id
 
@@ -48,7 +43,7 @@ async def signin(auth_request: AuthRequest):
         user, error = supabase.auth.sign_in_with_password(
             {"email": auth_request.email, "password": auth_request.password}
         )
-    except AuthApiError as e:
+    except error as e:
         print(f"Error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -69,7 +64,7 @@ async def create_user_in_users_table(user_id, email, username):
             .execute()
         )
 
-    except AuthApiError as e:
-        print(f"Error inserting user into custom table: {e.message}")
+    except error:
+        print(f"Error inserting user into custom table: {error.message}")
     else:
         print(f"User inserted into custom table: {data}")
