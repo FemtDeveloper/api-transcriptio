@@ -42,7 +42,7 @@ async def call_openai_chat_model(transcription: str):
     data = {
         "model": "gpt-3.5-turbo",
         "messages": [{"role": "user", "content": transcription}],
-        "max_tokens": 30,
+        "max_tokens": 50,
         "n": 1,
         "temperature": 0.5,
     }
