@@ -44,11 +44,7 @@ async def call_openai_chat_model(transcription: str):
         "messages": [
             {
                 "role": "system",
-                "content": "You are a wonderful interviewer and you have to answer about a certain topic defined in the first comment.",
-            },
-            {
-                "role": "user",
-                "content": "Like a psychologist or interviewer you are going to ask something related to the responses",
+                "content": "You are a wonderful interviewer and you are going to interview the user",
             },
         ],
         # TODO! revisar temperature
