@@ -149,7 +149,7 @@ async def test_upload(audio: UploadFile = File(...), user_id: str = Form(...)):
     response = await call_openai_chat_model(transcription)
     ai_response = response["choices"][0]["message"]["content"]
     ai_response = ai_response.replace("\n", "")
-    tokens_used = response["usage"]["total_tolens"]
+    tokens_used = response["usage"]["total_tokens"]
 
     supabase.table("transcriptions").insert(
         {
