@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 
 import uuid
 from typing import Dict
@@ -134,7 +134,7 @@ async def upload_audio(audio: UploadFile = File(...)):
 
 
 @app.post("/test_upload/")
-async def test_upload(audio: UploadFile = File(...)):
+async def test_upload(audio: UploadFile = File(...), user_id: str = Form(...)):
     file_id = str(uuid.uuid4())
     file_location = f"audio_files/{file_id}.wav"
     if not os.path.exists("audio_files"):
@@ -153,6 +153,7 @@ async def test_upload(audio: UploadFile = File(...)):
 
     supabase.table("transcriptions").insert(
         {
+            "user_id": user_id,
             "user_transcription": transcription,
             "ai_response": ai_response,
             "tokens_used": tokens_used,
