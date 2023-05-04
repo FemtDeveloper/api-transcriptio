@@ -41,8 +41,18 @@ async def call_openai_chat_model(transcription: str):
     }
     data = {
         "model": "gpt-3.5-turbo",
-        "messages": [{"role": "user", "content": transcription}],
-        "max_tokens": 50,
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a wonderful interviewer and you have to answer about a certain topic defined in the first comment.",
+            },
+            {
+                "role": "user",
+                "content": "Like a psychologist or interviewer you are going to ask something related to the responses",
+            },
+        ],
+        # TODO! revisar temperature
+        "max_tokens": 100,
         "n": 1,
         "temperature": 0.5,
     }
@@ -139,9 +149,14 @@ async def test_upload(audio: UploadFile = File(...)):
     response = await call_openai_chat_model(transcription)
     ai_response = response["choices"][0]["message"]["content"]
     ai_response = ai_response.replace("\n", "")
+    tokens_used = response["usage"]["total_tolens"]
 
     supabase.table("transcriptions").insert(
-        {"user_transcription": transcription, "ai_response": ai_response}
+        {
+            "user_transcription": transcription,
+            "ai_response": ai_response,
+            "tokens_used": tokens_used,
+        }
     ).execute()
 
     return {
