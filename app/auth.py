@@ -17,7 +17,7 @@ from pydantic import BaseModel
 # Use the same secret key for encoding and decoding JWT tokens
 SECRET_KEY = os.environ.get("SECRET_KEY")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -90,8 +90,10 @@ async def signin(auth_request: AuthRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    user_data = user[1]
+    user_id = user_data.id
     access_token = create_access_token(
-        data={"sub": user["user"]["id"]}, expires_delta=access_token_expires
+        data={"sub": user_id}, expires_delta=access_token_expires
     )
 
     return {"access_token": access_token, "token_type": "bearer", "user": user}
