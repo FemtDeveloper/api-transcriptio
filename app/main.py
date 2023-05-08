@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 
 import uuid
 from typing import Dict
@@ -12,7 +12,7 @@ import httpx
 import openai
 import speech_recognition as sr
 from pydub import AudioSegment
-from app.auth import AuthRequest, signin, signup
+from app.auth import AuthRequest, get_current_user, signin, signup
 from app.schema import (
     UserCreate,
 )  # Importing the necessary modules
@@ -91,6 +91,23 @@ async def register_user(
 async def login_user(auth_request: AuthRequest):
     response = await signin(auth_request)
     return response
+
+
+@app.get("/auth")
+async def auth_route(current_user_id: str = Depends(get_current_user)):
+    user = await get_user_by_id(current_user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"user": user}
+
+
+@app.get("/user/{user_id}")
+async def get_user_by_id(user_id: str):
+    user = supabase.table("users").select("*").eq("id", user_id).execute()
+    if user:
+        return user
+    else:
+        raise HTTPException(status_code=404, detail="User not found")
 
 
 @app.post("/transcribe/")
@@ -173,15 +190,6 @@ async def get_all_transcriptions():
 async def get_all_users():
     users = supabase.table("users").select("*").execute()
     return users
-
-
-@app.get("/user/{user_id}")
-async def get_user_by_id(user_id: str):
-    user = supabase.table("users").select("*").eq("id", user_id).execute()
-    if user:
-        return user
-    else:
-        raise HTTPException(status_code=404, detail="User not found")
 
 
 @app.get("/transcription/{transcription_id}")

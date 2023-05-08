@@ -76,7 +76,7 @@ async def signup(auth_request: AuthRequest):
     user_data = user[1]
     user_id = user_data.id
 
-    await create_user_in_users_table(user_id, auth_request.email, auth_request.username)
+    create_user_in_users_table(user_id, auth_request.email, auth_request.username)
     return {"message": "User registered successfully", "user": user}
 
 
@@ -102,7 +102,7 @@ async def signin(auth_request: AuthRequest):
 async def create_user_in_users_table(user_id, email, username):
     try:
         data, error = (
-            await supabase.table("users")
+            supabase.table("users")
             .insert(
                 {
                     "id": user_id,
