@@ -6,7 +6,7 @@ import os
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 
 import uuid
-from typing import Dict
+from typing import Dict, List
 import aiohttp
 import httpx
 import openai
@@ -33,26 +33,19 @@ app = FastAPI()
 uploaded_files: Dict[str, str] = {}
 
 
-async def call_openai_chat_model(messages: List[Dict[str, str]]):
-    url = "https://api.openai.com/v1/engines/davinci-codex/completions"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {openai.api_key}",
-    }
-    data = {
-        "messages": messages,
-        "max_tokens": 150,
-        "n": 1,
-        "stop": None,
-        "temperature": 0.5,
-    }
-
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, json=data, headers=headers)
-        response_json = (
-            response.json()
-        )  # Convert the APIResponse object to JSON-serializable object
-        return response_json
+async def call_openai_chat_model(prompt: str):
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "You are a sarcastic assistant."},
+            {"role": "user", "content": prompt},
+        ],
+        max_tokens=140,
+        n=1,
+        stop=None,
+        temperature=0.5,
+    )
+    return response
 
 
 async def transcribe_audio_with_deepgram(file_path: str):
@@ -144,6 +137,7 @@ async def upload_audio(audio: UploadFile = File(...)):
 
 @app.post("/test_upload/")
 async def test_upload(audio: UploadFile = File(...), user_id: str = Form(...)):
+    # async def test_upload(audio_file: UploadFile = File(...)):
     file_id = str(uuid.uuid4())
     file_location = f"audio_files/{file_id}.wav"
     if not os.path.exists("audio_files"):
@@ -154,22 +148,11 @@ async def test_upload(audio: UploadFile = File(...), user_id: str = Form(...)):
         f.write(audio.file.read())
     # Transcribe the audio file using Deepgram API
     transcription = await transcribe_audio_with_deepgram(file_location)
-    print(transcription)
 
     response = await call_openai_chat_model(transcription)
-    print(response)
     ai_response = response["choices"][0]["message"]["content"]
     ai_response = ai_response.replace("\n", "")
     tokens_used = response["usage"]["total_tokens"]
-    print(
-        {
-            "user_id": user_id,
-            "user_transcription": transcription,
-            "ai_response": ai_response,
-            "tokens_used": tokens_used,
-        }
-    )
-
     supabase.table("transcriptions").insert(
         {
             "user_id": user_id,
