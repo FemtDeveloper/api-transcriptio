@@ -65,7 +65,7 @@ async def transcribe_audio_with_deepgram(file_path: str):
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the transcription API"}
+    return {"message": "Welcome to the transcription APII"}
 
 
 @app.post("/signup")
