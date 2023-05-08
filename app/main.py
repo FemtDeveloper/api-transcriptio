@@ -33,30 +33,26 @@ app = FastAPI()
 uploaded_files: Dict[str, str] = {}
 
 
-async def call_openai_chat_model(transcription: str):
-    url = "https://api.openai.com/v1/chat/completions"
+async def call_openai_chat_model(messages: List[Dict[str, str]]):
+    url = "https://api.openai.com/v1/engines/davinci-codex/completions"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {openai.api_key}",
     }
     data = {
-        "model": "gpt-3.5-turbo",
-        "messages": [
-            {
-                "role": "system",
-                "content": "You are a wonderful interviewer and you are going to interview the user, follow the conversation",
-            },
-        ],
-        # TODO! revisar temperature
-        "max_tokens": 100,
+        "messages": messages,
+        "max_tokens": 150,
         "n": 1,
+        "stop": None,
         "temperature": 0.5,
     }
 
-    async with httpx.AsyncClient(timeout=20.0) as client:
+    async with httpx.AsyncClient() as client:
         response = await client.post(url, json=data, headers=headers)
-        response.raise_for_status()
-        return response.json()
+        response_json = (
+            response.json()
+        )  # Convert the APIResponse object to JSON-serializable object
+        return response_json
 
 
 async def transcribe_audio_with_deepgram(file_path: str):
@@ -158,11 +154,21 @@ async def test_upload(audio: UploadFile = File(...), user_id: str = Form(...)):
         f.write(audio.file.read())
     # Transcribe the audio file using Deepgram API
     transcription = await transcribe_audio_with_deepgram(file_location)
+    print(transcription)
 
     response = await call_openai_chat_model(transcription)
+    print(response)
     ai_response = response["choices"][0]["message"]["content"]
     ai_response = ai_response.replace("\n", "")
     tokens_used = response["usage"]["total_tokens"]
+    print(
+        {
+            "user_id": user_id,
+            "user_transcription": transcription,
+            "ai_response": ai_response,
+            "tokens_used": tokens_used,
+        }
+    )
 
     supabase.table("transcriptions").insert(
         {
