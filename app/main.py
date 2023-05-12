@@ -1,14 +1,24 @@
 from dotenv import load_dotenv
+from app.utils import (
+    delete_previous_files,
+    gpt3_completion,
+    gpt3_embedding,
+    load_conversation,
+    open_file,
+    timestamp_to_datetime,
+)
+
 
 load_dotenv()
 
 import os
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from time import time, sleep
+import pinecone
 
 import uuid
 from typing import Dict, List
 import aiohttp
-import httpx
 import openai
 import speech_recognition as sr
 from pydub import AudioSegment
@@ -27,6 +37,11 @@ supabase: Client = create_client(url, key)
 
 DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY")
 openai.api_key = os.environ.get("OPEN_API_KEY")
+pinecone.init(
+    api_key=os.environ.get("PINECONE_API_KEY"),
+    environment=os.environ.get("PINECONE_ENVIRONMENT"),
+)
+vdb = pinecone.Index("spikin-database")
 
 app = FastAPI()
 
@@ -208,3 +223,85 @@ async def get_transcriptions_by_user_id(user_id: str):
         raise HTTPException(
             status_code=404, detail="Transcriptions not found for the specified user"
         )
+
+
+convo_length = 8
+
+
+@app.post("/pinecone_chat/")
+async def pinecone_chat(audio: UploadFile = File(...)):
+    # async def test_upload(audio_file: UploadFile = File(...)):
+    file_id = str(uuid.uuid4())
+    file_location = f"audio_files/{file_id}.wav"
+    if not os.path.exists("audio_files"):
+        os.makedirs("audio_files")
+    delete_previous_files("audio_files")
+    delete_previous_files("gpt3_logs")
+
+    # Save the uploaded file
+    with open(file_location, "wb") as f:
+        f.write(audio.file.read())
+    # Transcribe the audio file using Deepgram API
+    payload = list()
+    transcription = await transcribe_audio_with_deepgram(file_location)
+    timestamp = time()
+    timestring = timestamp_to_datetime(timestamp)
+    a = "\n\nUSER: " + transcription
+    message = transcription
+    print(message)
+    # vector : embeddding of the message, we take it and we wait with him, the message is what we send
+    vector = gpt3_embedding(message)
+    # print(vector)
+    unique_id = str(uuid.uuid4())
+    metadata = {
+        "speaker": "USER",
+        "time": timestamp,
+        "message": message,
+        "timestring": timestring,
+        "uuid": unique_id,
+    }
+    supabase.table("messages_metadata").insert(
+        {
+            "message": metadata["message"],
+            "timestring": metadata["timestring"],
+            "uuid": metadata["uuid"],
+            "speaker": metadata["speaker"],
+        }
+    ).execute()
+    payload.append((unique_id, vector))
+    # print(payload)
+    results = vdb.query(vector=vector, top_k=convo_length)
+    print(results)
+    conversation = load_conversation(results)
+    print(conversation)
+    prompt = (
+        open_file("prompt_response.txt")
+        .replace("<<CONVERSATION>>", conversation)
+        .replace("<<MESSAGE>>", a)
+    )
+    print(prompt)
+    output = gpt3_completion(prompt)
+    timestamp = time()
+    timestring = timestamp_to_datetime(timestamp)
+    # message = '%s: %s - %s' % ('RAVEN', timestring, output)
+    message = output
+    vector = gpt3_embedding(message)
+    unique_id = str(uuid.uuid4())
+    metadata = {
+        "speaker": "Diomedes",
+        "time": timestamp,
+        "message": message,
+        "timestring": timestring,
+        "uuid": unique_id,
+    }
+    supabase.table("messages_metadata").insert(
+        {
+            "message": metadata["message"],
+            "timestring": metadata["timestring"],
+            "uuid": metadata["uuid"],
+            "speaker": metadata["speaker"],
+        }
+    ).execute()
+    payload.append((unique_id, vector))
+    vdb.upsert(payload)
+    return {"output": output, "prompt": prompt}
