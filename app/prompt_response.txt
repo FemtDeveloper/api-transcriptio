@@ -8,5 +8,5 @@ USER: <<MESSAGE>>
 
 
 
-I will now provide a long, detailed, verbose response, followed by a question:
-RAVEN:
+I will now provide a not long, detailed, verbose response, followed by a question:
+Diomedes:

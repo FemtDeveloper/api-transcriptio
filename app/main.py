@@ -12,7 +12,7 @@ from app.utils import (
 load_dotenv()
 
 import os
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, UploadFile
 from time import time, sleep
 import pinecone
 
@@ -80,6 +80,11 @@ async def transcribe_audio_with_deepgram(file_path: str):
 
 @app.get("/")
 async def root():
+    message_to_delete = 'Sure, you can use a script to test if your new function is erasing all the audio files or just the necessary ones. The script should be able to search through the root directory and identify the audio files that are no longer needed. It should then delete these files from the root directory. Additionally, you can use the script to check the file size of the audio files and make sure that they are not too large. Once you have written the script, you can use the command "docker exec" to execute the script within the image. Do you need any help with writing the script or do you have any other questions about deleting audio files?'
+    supabase.table("messages_metadata").delete().match(
+        {"message": message_to_delete}
+    ).execute()
+
     return {"message": "Welcome to the transcription APII"}
 
 
@@ -225,11 +230,11 @@ async def get_transcriptions_by_user_id(user_id: str):
         )
 
 
-convo_length = 8
+convo_length = 5
 
 
 @app.post("/pinecone_chat/")
-async def pinecone_chat(audio: UploadFile = File(...)):
+async def pinecone_chat(audio: UploadFile = File(...), user_id: str = Body(...)):
     # async def test_upload(audio_file: UploadFile = File(...)):
     file_id = str(uuid.uuid4())
     file_location = f"audio_files/{file_id}.wav"
@@ -259,6 +264,7 @@ async def pinecone_chat(audio: UploadFile = File(...)):
         "message": message,
         "timestring": timestring,
         "uuid": unique_id,
+        "user_id": user_id,
     }
     supabase.table("messages_metadata").insert(
         {
@@ -266,6 +272,7 @@ async def pinecone_chat(audio: UploadFile = File(...)):
             "timestring": metadata["timestring"],
             "uuid": metadata["uuid"],
             "speaker": metadata["speaker"],
+            "user_id": metadata["user_id"],
         }
     ).execute()
     payload.append((unique_id, vector))
@@ -293,6 +300,7 @@ async def pinecone_chat(audio: UploadFile = File(...)):
         "message": message,
         "timestring": timestring,
         "uuid": unique_id,
+        "user_id": metadata["user_id"],
     }
     supabase.table("messages_metadata").insert(
         {
@@ -300,6 +308,7 @@ async def pinecone_chat(audio: UploadFile = File(...)):
             "timestring": metadata["timestring"],
             "uuid": metadata["uuid"],
             "speaker": metadata["speaker"],
+            "user_id": metadata["user_id"],
         }
     ).execute()
     payload.append((unique_id, vector))
