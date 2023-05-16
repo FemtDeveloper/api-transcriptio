@@ -313,4 +313,4 @@ async def pinecone_chat(audio: UploadFile = File(...), user_id: str = Body(...))
     ).execute()
     payload.append((unique_id, vector))
     vdb.upsert(payload)
-    return {"output": output, "prompt": prompt, "message": message}
+    return {"output": output, "prompt": prompt, "transcription": transcription}
