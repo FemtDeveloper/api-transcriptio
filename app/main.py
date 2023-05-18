@@ -17,11 +17,10 @@ from time import time, sleep
 import pinecone
 
 import uuid
-from typing import Dict, List
+from typing import Dict, List, Optional
 import aiohttp
 import openai
-import speech_recognition as sr
-from pydub import AudioSegment
+
 from app.auth import AuthRequest, get_current_user, signin, signup
 from app.schema import (
     UserCreate,
@@ -80,11 +79,6 @@ async def transcribe_audio_with_deepgram(file_path: str):
 
 @app.get("/")
 async def root():
-    message_to_delete = 'Sure, you can use a script to test if your new function is erasing all the audio files or just the necessary ones. The script should be able to search through the root directory and identify the audio files that are no longer needed. It should then delete these files from the root directory. Additionally, you can use the script to check the file size of the audio files and make sure that they are not too large. Once you have written the script, you can use the command "docker exec" to execute the script within the image. Do you need any help with writing the script or do you have any other questions about deleting audio files?'
-    supabase.table("messages_metadata").delete().match(
-        {"message": message_to_delete}
-    ).execute()
-
     return {"message": "Welcome to the transcription APII"}
 
 
@@ -120,35 +114,23 @@ async def get_user_by_id(user_id: str):
 
 
 @app.post("/transcribe/")
-async def upload_audio(audio: UploadFile = File(...)):
+async def upload_audio(
+    audio: UploadFile = File(...), user_id: str = Body(...), topic: Optional[str] = None
+):
     file_id = str(uuid.uuid4())
     file_location = f"audio_files/{file_id}.wav"
-    temp_location = f"audio_files/temp_{file_id}.mp3"
-
     if not os.path.exists("audio_files"):
         os.makedirs("audio_files")
-
-    # Save the uploaded file temporarily
-    with open(temp_location, "wb") as f:
+    delete_previous_files("audio_files")
+    delete_previous_files("gpt3_logs")
+    # Save the uploaded file
+    with open(file_location, "wb") as f:
         f.write(audio.file.read())
-
-    # Convert the MP3 file to WAV format if necessary
-    file_extension = os.path.splitext(audio.filename)[-1].lower()
-    if file_extension == ".mp3":
-        mp3_audio = AudioSegment.from_mp3(temp_location)
-        mp3_audio.export(file_location, format="wav")
-        os.remove(temp_location)  # Remove the temporary MP3 file
-    else:
-        os.rename(temp_location, file_location)
-
-    uploaded_files[file_id] = file_location
-
-    # Transcribe the audio file
-    recognizer = sr.Recognizer()
-    with sr.AudioFile(file_location) as source:
-        audio_data = recognizer.record(source)
-        transcription = recognizer.recognize_google(audio_data)
-
+    # Transcribe the audio file using Deepgram API
+    transcription = await transcribe_audio_with_deepgram(file_location)
+    supabase.table("transcriptions").insert(
+        {"transcription": transcription, "user_id": user_id, "topic": topic}
+    )
     return {
         "file_id": file_id,
         "transcription": transcription,
