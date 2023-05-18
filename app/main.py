@@ -130,7 +130,7 @@ async def upload_audio(
     transcription = await transcribe_audio_with_deepgram(file_location)
     supabase.table("transcriptions").insert(
         {"transcription": transcription, "user_id": user_id, "topic": topic}
-    )
+    ).execute()
     return {
         "file_id": file_id,
         "transcription": transcription,
