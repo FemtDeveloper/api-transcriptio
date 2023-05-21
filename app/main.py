@@ -13,6 +13,7 @@ load_dotenv()
 
 import os
 from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import RedirectResponse
 from time import time, sleep
 import pinecone
 
@@ -80,6 +81,18 @@ async def transcribe_audio_with_deepgram(file_path: str):
 @app.get("/")
 async def root():
     return {"message": "Welcome to the transcription APII"}
+
+
+@app.get("/favicon.ico")
+def read_favicon():
+    return RedirectResponse(url="https://www.ionos.com/favicon.ico")
+
+
+@app.get("/images/icons/{file_name}")
+def read_icon(file_name: str):
+    return RedirectResponse(
+        url=f"https://cdn.pixabay.com/photo/2015/04/23/22/00/tree-736885_1280.jpg"
+    )
 
 
 @app.post("/signup")
