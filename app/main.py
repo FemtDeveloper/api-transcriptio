@@ -1,4 +1,6 @@
 from dotenv import load_dotenv
+from pydantic import ValidationError
+from app.models import UserData
 from app.utils import (
     delete_previous_files,
     gpt3_completion,
@@ -12,7 +14,16 @@ from app.utils import (
 load_dotenv()
 
 import os
-from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import (
+    Body,
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+)
 from fastapi.responses import RedirectResponse
 from time import time, sleep
 import pinecone
@@ -124,6 +135,33 @@ async def get_user_by_id(user_id: str):
         return user
     else:
         raise HTTPException(status_code=404, detail="User not found")
+
+
+@app.post("/user/update/")
+async def update_user(request: Request):
+    data = await request.json()
+
+    try:
+        user_data = UserData(**data)
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        response = (
+            supabase.table("users")
+            .update(user_data.dict(exclude_none=True))  # exclude None values
+            .eq("id", user_data.id)
+            .execute()
+        )
+        if "error" in response:
+            raise HTTPException(status_code=400, detail=response["error"])
+        return {
+            "message": "User data updated successfully",
+            "user_id": user_data.id,
+            "updated_data": user_data,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/transcribe/")
