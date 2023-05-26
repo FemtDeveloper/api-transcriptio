@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 from pydantic import ValidationError
-from app.models import UserData
+from app.models import TranscriptionData, UserData
 from app.utils import (
     delete_previous_files,
     gpt3_completion,
@@ -179,13 +179,88 @@ async def upload_audio(
         f.write(audio.file.read())
     # Transcribe the audio file using Deepgram API
     transcription = await transcribe_audio_with_deepgram(file_location)
-    supabase.table("transcriptions").insert(
-        {"transcription": transcription, "user_id": user_id, "topic": topic}
-    ).execute()
-    return {
-        "file_id": file_id,
-        "transcription": transcription,
-    }
+    res = (
+        supabase.table("transcriptions")
+        .insert({"transcription": transcription, "user_id": user_id, "topic": topic})
+        .execute()
+    )
+
+    print(res)
+    if res.data:
+        inserted_data = res.data[0]  # Fetch the first (and only) record inserted
+        return {
+            "transcriptionId": inserted_data["id"],
+            "transcription": transcription,
+        }
+
+
+@app.patch("/transcribe/update_topics")
+async def update_topics(
+    request: Request,
+):
+    data = await request.json()
+    ids: List[str] = data["ids"]
+    topic: str = data["topic"]
+    try:
+        for id in ids:
+            response = (
+                supabase.table("transcriptions")
+                .update({"topic": topic})
+                .eq("id", id)
+                .execute()
+            )
+            if "error" in response:
+                raise HTTPException(status_code=400, detail=response["error"])
+        return {"message": "Topics updated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/transcriptions_by_topic/")
+async def get_transcriptions(user_id: str, topic: str):
+    try:
+        response = (
+            supabase.table("transcriptions")
+            .select(
+                "id, transcription, topic"
+            )  # select only id, transcription, and topic fields
+            .eq("user_id", user_id)
+            .eq("topic", topic)
+            .execute()
+        )
+        if "error" in response:
+            raise HTTPException(status_code=400, detail=response["error"])
+
+        # Map the response data to your model
+        transcriptions = [TranscriptionData(**data) for data in response.data]
+
+        return transcriptions
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/user_topics/")
+async def get_user_topics(user_id: str):
+    try:
+        response = (
+            supabase.table("transcriptions")
+            .select("topic")
+            .eq("user_id", user_id)
+            .execute()
+        )
+        if "error" in response:
+            raise HTTPException(status_code=400, detail=response["error"])
+
+        # Get the unique topics
+        topics = list(
+            set([data["topic"] for data in response.data if data["topic"] is not None])
+        )
+
+        return topics
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/test_upload/")

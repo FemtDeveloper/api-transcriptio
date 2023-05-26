@@ -13,3 +13,9 @@ class UserData(BaseModel):
     ai_role: Optional[str] = None
     interests: Optional[List[str]] = None
     usage_time: Optional[str] = None
+
+
+class TranscriptionData(BaseModel):
+    id: str
+    transcription: str
+    topic: str
