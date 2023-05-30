@@ -342,7 +342,10 @@ convo_length = 5
 
 
 @app.post("/pinecone_chat/")
-async def pinecone_chat(audio: UploadFile = File(...), user_id: str = Body(...)):
+async def pinecone_chat(
+    audio: UploadFile = File(...), user_id: str = Body(...), user_name: str = Body(...)
+):
+    print(user_name)
     # async def test_upload(audio_file: UploadFile = File(...)):
     file_id = str(uuid.uuid4())
     file_location = f"audio_files/{file_id}.wav"
@@ -359,15 +362,15 @@ async def pinecone_chat(audio: UploadFile = File(...), user_id: str = Body(...))
     transcription = await transcribe_audio_with_deepgram(file_location)
     timestamp = time()
     timestring = timestamp_to_datetime(timestamp)
-    a = "\n\nUSER: " + transcription
+    a = "\n\n%s: " % user_name + transcription
     message = transcription
-    print(message)
+    # print(message)
     # vector : embeddding of the message, we take it and we wait with him, the message is what we send
     vector = gpt3_embedding(message)
     # print(vector)
     unique_id = str(uuid.uuid4())
     metadata = {
-        "speaker": "USER",
+        "speaker": user_name,
         "time": timestamp,
         "message": message,
         "timestring": timestring,
@@ -386,14 +389,23 @@ async def pinecone_chat(audio: UploadFile = File(...), user_id: str = Body(...))
     payload.append((unique_id, vector))
     # print(payload)
     results = vdb.query(vector=vector, top_k=convo_length)
-    print(results)
+    # print(results)
     conversation = load_conversation(results)
-    print(conversation)
+    # print(conversation)
     prompt = (
         open_file("prompt_response.txt")
         .replace("<<CONVERSATION>>", conversation)
+        .replace("<<USER>>", user_name)
         .replace("<<MESSAGE>>", a)
     )
+    try:
+        with open(
+            "prompt.txt", "w"
+        ) as file:  # 'w' mode will overwrite the existing file
+            file.write(prompt)
+        print("Prompt written to file successfully.")
+    except Exception as e:
+        print(f"Failed to write to file: {e}")
     print(prompt)
     output = gpt3_completion(prompt)
     timestamp = time()

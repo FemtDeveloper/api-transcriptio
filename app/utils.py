@@ -101,6 +101,7 @@ def gpt3_completion(
             if not os.path.exists("gpt3_logs"):
                 os.makedirs("gpt3_logs")
             save_file("gpt3_logs/%s" % filename, prompt + "\n\n==========\n\n" + text)
+            print(text)
             return text
         except Exception as oops:
             retry += 1
