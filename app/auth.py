@@ -76,7 +76,7 @@ async def signup(auth_request: AuthRequest):
     user_data = user[1]
     user_id = user_data.id
 
-    create_user_in_users_table(user_id, auth_request.email, auth_request.username)
+    await create_user_in_users_table(user_id, auth_request.email, auth_request.username)
     return {"message": "User registered successfully", "user": user}
 
 
