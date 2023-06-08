@@ -1,6 +1,8 @@
+import aiofiles
 from dotenv import load_dotenv
+from httpx import RequestError
 from pydantic import ValidationError
-from app.models import TranscriptionData, UserData
+from app.models import TranscriptionData, UserData, UserWithAvatar
 from app.utils import (
     delete_previous_files,
     gpt3_completion,
@@ -139,18 +141,25 @@ async def get_user_by_id(user_id: str):
 
 @app.post("/user/update/")
 async def update_user(request: Request):
-    data = await request.json()
+    form = await request.form()
+    print(form)
 
-    try:
-        user_data = UserData(**data)
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    user_data = UserWithAvatar(
+        id=form["id"],
+        user_name=form["name"],
+        assistant_name=form["assistant_name"],
+        gender=form["gender"],
+        age=form["age"],
+        phone_number=form["phone_number"],
+        nationality=form["nationality"],
+        avatar_url=form["avatar_url"],
+    )
 
     try:
         response = (
             supabase.table("users")
             .update(user_data.dict(exclude_none=True))  # exclude None values
-            .eq("id", user_data.id)
+            .eq("id", form["id"])
             .execute()
         )
         if "error" in response:

@@ -19,3 +19,15 @@ class TranscriptionData(BaseModel):
     id: str
     transcription: str
     topic: str
+
+
+class UserWithAvatar(BaseModel):
+    id: str
+    user_name: Optional[str]
+    assistant_name: Optional[str]
+    gender: Optional[str]
+    age: Optional[str]
+    phone_number: Optional[str]
+    country_code: Optional[str]
+    nationality: Optional[str]
+    avatar_url: Optional[str]
