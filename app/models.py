@@ -31,3 +31,9 @@ class UserWithAvatar(BaseModel):
     country_code: Optional[str]
     nationality: Optional[str]
     avatar_url: Optional[str]
+
+
+class TextChat(BaseModel):
+    message: str
+    user_name: str
+    user_id: str

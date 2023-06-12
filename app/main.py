@@ -1,21 +1,6 @@
-import aiofiles
+import random
 from dotenv import load_dotenv
-from httpx import RequestError
-from pydantic import ValidationError
-from app.models import TranscriptionData, UserData, UserWithAvatar
-from app.utils import (
-    delete_previous_files,
-    gpt3_completion,
-    gpt3_embedding,
-    load_conversation,
-    open_file,
-    timestamp_to_datetime,
-)
 
-
-load_dotenv()
-
-import os
 from fastapi import (
     Body,
     Depends,
@@ -27,18 +12,31 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.responses import RedirectResponse
-from time import time, sleep
-import pinecone
-
-import uuid
 from typing import Dict, List, Optional
+import os
+import uuid
 import aiohttp
 import openai
+from time import time
+import pinecone
+
+from app.models import TextChat, TranscriptionData, UserWithAvatar
+from app.utils import (
+    delete_previous_files,
+    gpt3_completion,
+    gpt3_embedding,
+    load_conversation,
+    open_file,
+    timestamp_to_datetime,
+)
+
+load_dotenv()
+
 
 from app.auth import AuthRequest, get_current_user, signin, signup
 from app.schema import (
     UserCreate,
-)  # Importing the necessary modules
+)
 
 from supabase import create_client, Client
 
@@ -355,7 +353,6 @@ async def pinecone_chat(
     audio: UploadFile = File(...), user_id: str = Body(...), user_name: str = Body(...)
 ):
     print(user_name)
-    # async def test_upload(audio_file: UploadFile = File(...)):
     file_id = str(uuid.uuid4())
     file_location = f"audio_files/{file_id}.wav"
     if not os.path.exists("audio_files"):
@@ -366,17 +363,14 @@ async def pinecone_chat(
     # Save the uploaded file
     with open(file_location, "wb") as f:
         f.write(audio.file.read())
-    # Transcribe the audio file using Deepgram API
     payload = list()
     transcription = await transcribe_audio_with_deepgram(file_location)
     timestamp = time()
     timestring = timestamp_to_datetime(timestamp)
     a = "\n\n%s: " % user_name + transcription
     message = transcription
-    # print(message)
     # vector : embeddding of the message, we take it and we wait with him, the message is what we send
     vector = gpt3_embedding(message)
-    # print(vector)
     unique_id = str(uuid.uuid4())
     metadata = {
         "speaker": user_name,
@@ -395,36 +389,39 @@ async def pinecone_chat(
             "user_id": metadata["user_id"],
         }
     ).execute()
+    topic_chars = (
+        supabase.table("users")
+        .select("interests", "ai_role", "assistant_name")
+        .eq("id", user_id)
+        .execute()
+    )
+    print(topic_chars)
+    for user in topic_chars.data:
+        interests = user["interests"]
+        ai_role = user["ai_role"]
+        assistant_name = user["assistant_name"]
+
     payload.append((unique_id, vector))
-    # print(payload)
     results = vdb.query(vector=vector, top_k=convo_length)
-    # print(results)
     conversation = load_conversation(results)
-    # print(conversation)
     prompt = (
         open_file("prompt_response.txt")
         .replace("<<CONVERSATION>>", conversation)
         .replace("<<USER>>", user_name)
         .replace("<<MESSAGE>>", a)
+        .replace("<<assistant_name>>", assistant_name)
+        .replace("<<ai_role>>", ai_role)
+        .replace("<<topic>>", random.choice(interests))
     )
-    try:
-        with open(
-            "prompt.txt", "w"
-        ) as file:  # 'w' mode will overwrite the existing file
-            file.write(prompt)
-        print("Prompt written to file successfully.")
-    except Exception as e:
-        print(f"Failed to write to file: {e}")
-    print(prompt)
+
     output = gpt3_completion(prompt)
     timestamp = time()
     timestring = timestamp_to_datetime(timestamp)
-    # message = '%s: %s - %s' % ('RAVEN', timestring, output)
     message = output
     vector = gpt3_embedding(message)
     unique_id = str(uuid.uuid4())
     metadata = {
-        "speaker": "Diomedes",
+        "speaker": assistant_name,
         "time": timestamp,
         "message": message,
         "timestring": timestring,
@@ -442,4 +439,93 @@ async def pinecone_chat(
     ).execute()
     payload.append((unique_id, vector))
     vdb.upsert(payload)
-    return {"output": output, "prompt": prompt, "transcription": transcription}
+    return {
+        "output": output,
+        "prompt": prompt,
+        "transcription": transcription,
+        "interests": interests,
+    }
+
+
+@app.post("/text_chat/")
+async def text_chat(chat: TextChat):
+    print(chat.user_name)
+
+    delete_previous_files("gpt3_logs")
+
+    payload = list()
+    timestamp = time()
+    timestring = timestamp_to_datetime(timestamp)
+    a = "\n\n%s: " % chat.user_name + chat.message
+    vector = gpt3_embedding(chat.message)
+    unique_id = str(uuid.uuid4())
+    metadata = {
+        "speaker": chat.user_name,
+        "time": timestamp,
+        "message": chat.message,
+        "timestring": timestring,
+        "uuid": unique_id,
+        "user_id": chat.user_id,
+    }
+    supabase.table("messages_metadata").insert(
+        {
+            "message": metadata["message"],
+            "timestring": metadata["timestring"],
+            "uuid": metadata["uuid"],
+            "speaker": metadata["speaker"],
+            "user_id": metadata["user_id"],
+        }
+    ).execute()
+
+    topic_chars = (
+        supabase.table("users")
+        .select("interests", "ai_role", "assistant_name")
+        .eq("id", chat.user_id)
+        .execute()
+    )
+    print(topic_chars)
+    for user in topic_chars.data:
+        interests = user["interests"]
+        ai_role = user["ai_role"]
+        assistant_name = user["assistant_name"]
+
+    payload.append((unique_id, vector))
+    results = vdb.query(vector=vector, top_k=convo_length)
+    conversation = load_conversation(results)
+    prompt = (
+        open_file("prompt_response.txt")
+        .replace("<<CONVERSATION>>", conversation)
+        .replace("<<USER>>", chat.user_name)
+        .replace("<<MESSAGE>>", a)
+        .replace("<<assistant_name>>", assistant_name)
+        .replace("<<ai_role>>", ai_role)
+        .replace("<<topic>>", random.choice(interests))
+    )
+
+    output = gpt3_completion(prompt)
+    timestamp = time()
+    timestring = timestamp_to_datetime(timestamp)
+    # message = '%s: %s - %s' % ('RAVEN', timestring, output)
+    message = output
+    vector = gpt3_embedding(message)
+    unique_id = str(uuid.uuid4())
+    metadata = {
+        "speaker": assistant_name,
+        "time": timestamp,
+        "message": message,
+        "timestring": timestring,
+        "uuid": unique_id,
+        "user_id": metadata["user_id"],
+    }
+    supabase.table("messages_metadata").insert(
+        {
+            "message": metadata["message"],
+            "timestring": metadata["timestring"],
+            "uuid": metadata["uuid"],
+            "speaker": metadata["speaker"],
+            "user_id": metadata["user_id"],
+        }
+    ).execute()
+    payload.append((unique_id, vector))
+    vdb.upsert(payload)
+    return {"output": output, "prompt": prompt, "topic_chars": topic_chars}
