@@ -20,7 +20,7 @@ import openai
 from time import time
 import pinecone
 
-from app.models import TextChat, TranscriptionData, UserWithAvatar
+from app.models import TextChat, TranscriptionData, UserData, UserWithAvatar
 from app.utils import (
     delete_previous_files,
     gpt3_completion,
@@ -138,26 +138,12 @@ async def get_user_by_id(user_id: str):
 
 
 @app.post("/user/update/")
-async def update_user(request: Request):
-    form = await request.form()
-    print(form)
-
-    user_data = UserWithAvatar(
-        id=form["id"],
-        user_name=form["name"],
-        assistant_name=form["assistant_name"],
-        gender=form["gender"],
-        age=form["age"],
-        phone_number=form["phone_number"],
-        nationality=form["nationality"],
-        avatar_url=form["avatar_url"],
-    )
-
+async def update_user(user_data: UserData):
     try:
         response = (
             supabase.table("users")
             .update(user_data.dict(exclude_none=True))  # exclude None values
-            .eq("id", form["id"])
+            .eq("id", user_data.id)
             .execute()
         )
         if "error" in response:
@@ -352,7 +338,6 @@ convo_length = 5
 async def pinecone_chat(
     audio: UploadFile = File(...), user_id: str = Body(...), user_name: str = Body(...)
 ):
-    print(user_name)
     file_id = str(uuid.uuid4())
     file_location = f"audio_files/{file_id}.wav"
     if not os.path.exists("audio_files"):
@@ -449,8 +434,6 @@ async def pinecone_chat(
 
 @app.post("/text_chat/")
 async def text_chat(chat: TextChat):
-    print(chat.user_name)
-
     delete_previous_files("gpt3_logs")
 
     payload = list()
@@ -483,7 +466,6 @@ async def text_chat(chat: TextChat):
         .eq("id", chat.user_id)
         .execute()
     )
-    print(topic_chars)
     for user in topic_chars.data:
         interests = user["interests"]
         ai_role = user["ai_role"]

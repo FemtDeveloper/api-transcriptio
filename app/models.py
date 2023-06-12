@@ -4,15 +4,17 @@ from pydantic import BaseModel
 
 class UserData(BaseModel):
     id: str
-    user_name: Optional[str] = None
-    assistant_name: Optional[str] = None
-    gender: Optional[str] = None
     age: Optional[str] = None
+    ai_role: Optional[str] = None
+    assistant_name: Optional[str] = None
+    avatar_url: Optional[str]
+    country_code: Optional[str]
+    gender: Optional[str] = None
+    interests: Optional[List[str]] = None
     nationality: Optional[str] = None
     phone_number: Optional[str] = None
-    ai_role: Optional[str] = None
-    interests: Optional[List[str]] = None
     usage_time: Optional[str] = None
+    user_name: Optional[str] = None
 
 
 class TranscriptionData(BaseModel):
@@ -23,14 +25,14 @@ class TranscriptionData(BaseModel):
 
 class UserWithAvatar(BaseModel):
     id: str
-    user_name: Optional[str]
-    assistant_name: Optional[str]
-    gender: Optional[str]
     age: Optional[str]
-    phone_number: Optional[str]
-    country_code: Optional[str]
-    nationality: Optional[str]
+    assistant_name: Optional[str]
     avatar_url: Optional[str]
+    country_code: Optional[str]
+    gender: Optional[str]
+    nationality: Optional[str]
+    phone_number: Optional[str]
+    user_name: Optional[str]
 
 
 class TextChat(BaseModel):
