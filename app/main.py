@@ -52,7 +52,7 @@ pinecone.init(
     api_key=os.environ.get("PINECONE_API_KEY"),
     environment=os.environ.get("PINECONE_ENVIRONMENT"),
 )
-vdb = pinecone.Index("spikin-database")
+vdb = pinecone.Index("spikin-database-index")
 
 app = FastAPI()
 
@@ -91,7 +91,7 @@ async def transcribe_audio_with_deepgram(file_path: str):
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the transcription APII"}
+    return {"message": "Welcome to the transcription API"}
 
 
 @app.get("/favicon.ico")
